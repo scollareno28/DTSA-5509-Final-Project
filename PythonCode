@@ -1,0 +1,757 @@
+# %% [markdown]
+# # Drug Classification using Supervised Machine Learning #
+# ## Overview ##
+# Data has been collected from a set of patients that all suffer from the same illness.  Throughout their treatment, each patient responded to one of five different medications.  The purpose of this exercise, is to develop a model that could help predict the appropriate drug for a future patient with the same illness based on certain characteristics about their health.  
+# 
+# The model will be developed using three different supervised machine learning models: a decision tree, logistic regression, and a random forest.  
+# 
+# This dataset came from Kaggle:  https://www.kaggle.com/datasets/prathamtripathi/drug-classification
+# See the citations section for detailed citation of this dataset.
+# 
+# The license of this dataset is a public domain with over 261 different code contributions and the size of the dataset is 2 kB.  
+# 
+# The data will be imported using pandas.
+
+# %% [markdown]
+# 
+# ### Loading and Exploring Raw Dataset ###
+# 
+
+# %%
+import pandas as pd
+import numpy as np
+data = pd.read_csv('drugdata200.csv')
+
+
+# %% [markdown]
+# Now that the dataset has been imported, it's time to understand what is in this dataset.
+
+# %%
+data.info
+
+# %%
+data.shape
+
+# %%
+data.dtypes
+
+# %% [markdown]
+# Looking at the columns, this dataset uses a variety of factors including age, sex, blood pressure (BP), Cholesterol, and Na/k ratio (NA_to_K).  Na is sodium and K is potassium.  In recent years, doctors have been using the Na/K as a ratio to measure a person's diet quality and overall health according to the European Journal of Medical Research: https://eurjmedres.biomedcentral.com/articles/10.1186/s40001-020-00476-5#citeas.  
+# 
+# The drug column is the label and ultimately the target.  
+# 
+# ## Data cleaning ## 
+# 
+# First check to see if there are any missing values:
+# 
+
+# %%
+if data.isnull().values.any():
+    print("Dataframe contains null values")
+else:
+    print("Dataframe has no null values")
+
+# %% [markdown]
+# Looking at the Na/K column, the number of decimal places will be reduce in order to make the data easier to look at.
+
+# %%
+#Rounds the decimal places 
+data["Na_to_K"] = data["Na_to_K"].round(2)
+data.info
+
+# %% [markdown]
+# Look at how each drug is labeled:
+# 
+
+# %%
+unique_drugs = data["Drug"].unique()
+for drug in unique_drugs:
+    print(drug)
+
+# %% [markdown]
+# To reduce redundancy, each drug variable will be renamed.  
+
+# %%
+#Create a mapping dictionary
+mapping = {
+    'DrugY': 'Y',
+    'drugC': 'C',
+    'drugX': 'X',
+    'drugA': 'A',
+    'drugB': 'B'    
+}
+#Now use the dictionary to replace
+data["Drug"] = data["Drug"].replace(mapping)
+print(data)
+
+# %% [markdown]
+# Let's also take a look at the statistics of the dataset
+
+# %%
+#Statistical Analysis
+statistics = data.describe()
+print(statistics)
+
+# %% [markdown]
+# The numeric values all seem to be reasonable and no outliers are detected.  It's important to check if there are any unique values for the other remaining categorical values to ensure a clean dataset.
+
+# %%
+# Unique Blood Pressure
+unique_BP = data["BP"].unique()
+for i in unique_BP:
+    print(i)
+
+# Unique Cholesterol
+unique_cholesterol = data["Cholesterol"].unique()
+for i in unique_cholesterol :
+    print(i)
+
+# Unique Sex
+unique_sex = data["Sex"].unique()
+for i in unique_sex :
+    print(i)
+
+# %% [markdown]
+# All of the categorical values have the expected values.  There are not any typos or misplaced data labels.
+# 
+# The cleaning that was done for this dataset was done in order to make working with decimals in the "Na_to_K" easier and reduce the redundancy of the "Drug" column.  
+
+# %% [markdown]
+# ## Exploratory Data Analysis (EDA)  ##
+# 
+# The data looks good enought work with and explore at a higher lever.  The purpose of doing this is to detect any outliers that might mess with the data or be a mistake.
+# 
+# Additionally, deeper analysis could result in uncovering relationships between variables or variables and the label. 
+# 
+# 
+
+# %%
+import matplotlib.pyplot as plt 
+# Age distribution
+plt.hist(data["Age"], bins = 10, edgecolor = 'black')
+plt.title("Age Distribution")
+plt.xlabel("Age")
+plt.ylabel("Frequency")
+plt.show()
+
+# %%
+# Sex distribution
+sex_counts = data["Sex"].value_counts()
+colors = ['blue', 'orange']
+plt.bar(sex_counts.index, sex_counts.values, color = colors)
+plt.title("Sex Distribution")
+plt.xlabel("Sex")
+plt.ylabel("Count")
+plt.show()
+
+# %%
+import seaborn as sns
+# Blood pressure distribution
+bp_counts = data["BP"].value_counts()
+colors = sns.color_palette("colorblind")
+plt.bar(bp_counts.index, bp_counts.values, color = colors)
+plt.title("Blood Pressure Distribution")
+plt.xlabel("Blood Pressure")
+plt.ylabel("Count")
+plt.show()
+
+# %%
+# Cholesterol distribution
+Cholesterol_counts = data["Cholesterol"].value_counts()
+colors = sns.color_palette("colorblind")
+plt.bar(Cholesterol_counts.index, Cholesterol_counts.values, color = colors)
+plt.title("Cholesterol Distribution")
+plt.xlabel("Cholesterol")
+plt.ylabel("Count")
+plt.show()
+
+# %%
+# Na/K distribution
+plt.hist(data["Na_to_K"], bins = 10, edgecolor = 'black')
+plt.title("Na/K Distribution")
+plt.xlabel("Na/K")
+plt.ylabel("Frequency")
+plt.show()
+
+# %% [markdown]
+# Age, cholesterol, blood pressure, and sex all seem to have a good distribution but Na/K appears a little lopsided.  Let's look at how this may affect things by comparing the N/K ratio across age, cholesterol, blood pressure, and sex.
+# 
+# 
+
+# %%
+#Create plot comparing Na/K vs age by sex
+# Create the scatter plot
+plt.scatter(data[data['Sex'] == 'M']['Age'], data[data['Sex'] == 'M']['Na_to_K'], color='blue', label='Male', alpha=0.7, marker='o')
+plt.scatter(data[data['Sex'] == 'F']['Age'], data[data['Sex'] == 'F']['Na_to_K'], color='red', label='Female', alpha=0.7, marker='^')
+
+
+plt.title("Scatter Plot: Na_to_K vs. Age by Sex")
+plt.xlabel("Age")
+plt.ylabel("Na_to_K")
+
+plt.legend()
+
+plt.show()
+
+
+#Create plot comparing Na/K vs age by Cholesterol
+# Create the scatter plot
+plt.scatter(data[data['Cholesterol'] == 'HIGH']['Age'], data[data['Cholesterol'] == 'HIGH']['Na_to_K'], color='red', label='High Cholesterol', alpha=0.7, marker='o')
+plt.scatter(data[data['Cholesterol'] == 'NORMAL']['Age'], data[data['Cholesterol'] == 'NORMAL']['Na_to_K'], color='blue', label='Normal Cholesterol', alpha=0.7, marker='^')
+
+
+plt.title("Scatter Plot: Na_to_K vs. Age by Cholesterol")
+plt.xlabel("Age")
+plt.ylabel("Na_to_K")
+
+plt.legend()
+
+plt.show()
+
+
+#Create plot comparing Na/K vs age by Blood Pressure
+# Create the scatter plot
+plt.scatter(data[data['BP'] == 'HIGH']['Age'], data[data['BP'] == 'HIGH']['Na_to_K'], color='red', label='High Blood Pressure', alpha=0.7, marker='o')
+plt.scatter(data[data['BP'] == 'NORMAL']['Age'], data[data['BP'] == 'NORMAL']['Na_to_K'], color='blue', label='Normal Blood Pressure', alpha=0.7, marker='^')
+plt.scatter(data[data['BP'] == 'LOW']['Age'], data[data['BP'] == 'LOW']['Na_to_K'], color='green', label='Low Blood Pressure', alpha=0.7, marker='s')
+
+plt.title("Scatter Plot: Na_to_K vs. Age by Blood Pressure")
+plt.xlabel("Age")
+plt.ylabel("Na_to_K")
+
+plt.legend()
+
+plt.show()
+
+# %% [markdown]
+# Based on the scatter plots above, the biggest takeaway is that there doesn't seem to be any relation among the variables.  Further analysis will be needed to confirm if this is the case.
+# 
+# Since sex, cholesterol, and blood pressure are all categorical data some scatter plots were made since these values aren't useful for making a correlation heatmap or corrleation matrix.  This will create further confirmation about the relationship between variables.  
+
+# %%
+# Select the "Na_to_K" and "Age" columns
+columns = ["Na_to_K", "Age"]
+subset_data = data[columns]
+# Compute the correlation matrix
+correlation_matrix = subset_data.corr()
+
+# Create the heatmap
+plt.figure(figsize=(8, 6))
+sns.heatmap(correlation_matrix, annot=True, cmap="viridis")
+
+plt.title("Correlation Heatmap: Na_to_K vs Age")
+plt.show()
+
+
+# %% [markdown]
+# As expected based on the scatterplots, there is a very weak negative correlation between the two variables.  
+# 
+# Overall it does not look like the variables will influence one another very much.
+# 
+# ### Exploring the variables and their relation to the drug type ###
+# Continuing the exploration, it is important to take a look at how each drug type may relate to each variable.
+# 
+# First, let's take a look at the distribution of the drug type.  
+# 
+
+# %%
+# Count the occurrences of each unique value in the "Drug" column
+drug_counts = data["Drug"].value_counts()
+
+# Create the bar plot
+plt.figure(figsize=(8, 6))
+sns.countplot(x="Drug", data=data, palette="colorblind")
+
+
+plt.title("Distribution of Drug")
+plt.xlabel("Drug")
+plt.ylabel("Count")
+
+
+plt.show()
+
+# %% [markdown]
+# There is a noticeable amount of Drug Y compared to the other drugs in this dataset.  This will become important before any classification begins, but for now more analysis is required.
+# 
+# Violin plots will be used to examine the distribution of drugs across age and Na/K ratio becuase they are numeric.
+
+# %%
+# Violin Plots
+# Drug and age
+plt.figure(figsize=(8, 6))
+sns.violinplot(x="Drug", y="Age", data=data, palette="colorblind")
+
+
+plt.title("Distribution of Age by Drug")
+plt.xlabel("Drug")
+plt.ylabel("Age")
+
+
+plt.show()
+
+# Drug and Na/K
+plt.figure(figsize=(8, 6))
+sns.violinplot(x="Drug", y="Na_to_K", data=data, palette="colorblind")
+
+
+plt.title("Distribution of Age by Na/K")
+plt.xlabel("Drug")
+plt.ylabel("Na/K")
+
+
+plt.show()
+
+# %% [markdown]
+# Now bar plots can be used comparing the drugs vs Blood Pressure, Cholesterol, and sex.
+
+# %%
+#Create plot for Blood Pressure
+plt.figure(figsize=(8, 6))
+sns.countplot(x="BP", hue="Drug", data=data, palette="colorblind")
+
+# Set plot title and axis labels
+plt.title("Distribution of Drugs by Blood Pressure")
+plt.xlabel("Blood Pressure")
+plt.ylabel("Count")
+
+# Add a legend
+plt.legend(title="Drug", loc="upper right")
+
+# Display the plot
+plt.show()
+
+
+
+
+
+
+#Create plot for Cholesterol
+plt.figure(figsize=(8, 6))
+sns.countplot(x="Cholesterol", hue="Drug", data=data, palette="colorblind")
+
+# Set plot title and axis labels
+plt.title("Distribution of Drugs by Cholesterol")
+plt.xlabel("Cholesterol")
+plt.ylabel("Count")
+
+# Add a legend
+plt.legend(title="Drug", loc="upper right")
+
+# Display the plot
+plt.show()
+
+
+
+
+
+
+#Create plot for Sex
+plt.figure(figsize=(8, 6))
+sns.countplot(x="Sex", hue="Drug", data=data, palette="colorblind")
+
+# Set plot title and axis labels
+plt.title("Distribution of Drugs by Sex")
+plt.xlabel("Sex")
+plt.ylabel("Count")
+
+# Add a legend
+plt.legend(title="Drug", loc="upper right")
+
+# Display the plot
+plt.show()
+
+# %% [markdown]
+# Here are the takeaway for comparing the drugs vs variables:
+# 
+# -Age: Drugs Y, X, and C appear to be prescribed across all ages.  However, drug A does not appear to be for young or old people while drug B appears to be exclusively for older people.
+# 
+# -Na/K: Drug Y appears to be prescribed to people with higher Na/K ratios.  Really anything with a ratio greater than 15.  The other drugs, appear to all be for low ratios.  
+# 
+# -Blood Pressure: Drug Y appears across all 3 levels of BP, drug C is only found with the low BP population, drugs A and B are only found with the high BP popluation, and drug X is found with the low and normal BP populations.
+# 
+# -Cholesterol: Drug C is only found in the high cholesterol population while the other 4 drugs are evenly dispersed across high and low cholestorol populations. 
+#  
+# -Sex:  All drugs are evenly distriubted across both sexes.  
+
+# %% [markdown]
+# ## Models ##
+# 
+# ### Dataset Preparation for Models  ###
+# 
+# After going through the EDA and looking at the results of the correlation matrix as well as all the other plots, there is some potential for colinearity.  This is indidcated in the plots done in the previous section as well as the takeaways.  While collinearity may not be inherently bad, it could result in overfitting.  As a result, feature engineering will be done later to address this concern.  
+# 
+# First step is to split the dataset into training and testing data.  The data will be split into 80% training and 20% testing.  The sklearn library will be important for this.
+
+# %%
+# Import important libraries
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import classification_report 
+from sklearn.model_selection import train_test_split
+
+# Remove the features and set the target variable 
+# X will remove the features, y will be the target variable
+X = data.drop("Drug", axis = 1)
+y = data["Drug"]
+
+# Split the dataset
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 42)
+
+# To understand the training and testing a little better it's best to see the shape
+print(X_train.shape, y_train.shape)
+print(X_test.shape, y_test.shape)
+
+
+# %% [markdown]
+# The shapes appear to be what is expected.
+# 
+# Now, some feature engineering needs to be done on the training and testing datasets to improve the overall performance of the machine learning models.  This is because much of the data is categorical values.
+
+# %%
+# Import from the sklearn library
+from sklearn.preprocessing import LabelEncoder
+
+# Apply label encoding to the categorical columns
+label_encoder = LabelEncoder()
+categorical_columns = ["BP", "Cholesterol", "Sex"]
+
+for column in categorical_columns:
+    X[column] = label_encoder.fit_transform(X[column])
+
+# Split the dataset again
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 42)
+
+X_train.head()
+
+
+# %%
+X_test.head()
+
+# %% [markdown]
+# The last thing needed to be done for the models, is to prevent overfitting.  
+# 
+# As stated previously, "Y" drug is far more prevelant than the other drugs.  Since there's just one drug that is higher than the others, undersampling will be the technique of choice. 
+
+# %%
+# Import the necessary libraries 
+!pip install imbalanced-learn
+from imblearn.under_sampling import RandomUnderSampler
+
+# Use an instance of the under-sampler
+undersampler = RandomUnderSampler(random_state = 42)
+X_train, y_train = undersampler.fit_resample(X_train, y_train)
+
+# %%
+import matplotlib.pyplot as plt
+import seaborn as sns
+# Calculate the count of each drug category in the undersampled data
+drug_counts = y_train.value_counts()
+
+# Create a bar plot to visualize the drug distribution
+plt.bar(drug_counts.index, drug_counts.values)
+plt.xlabel('Drug')
+plt.ylabel('Count')
+plt.title('Distribution of Drugs (Undersampled)')
+plt.show()
+
+# %% [markdown]
+# 
+# 
+# #### Model Selection ####
+# Three models will be used on this dataset.
+# 
+# Decision tree classifier: this model was chosen because there does not seem to be much of any linear relationship in the data and decision tree classifiers handle randomization very well.
+# 
+# Logistic Regression:  this model was chosen because it is reliant on linear relationships in order to do a good job of predicting.  This will be a good way to compare and contrast against the other chosen models.  Also, while there does not appear to be a strong linear relationship in the data, there is some.  Potentially that means this model could be good at predicting things the other models aren't.  
+# 
+# Random forest:  this model was chosen for the same reason the decision tree classifier was except that random forests are a more complex version of a decision tree classifier.  This should mean that the random forest will perform as well or better than the decision tree.  
+# 
+# 
+# 
+# The first model used for this dataset will be a decision tree classifier.
+
+# %%
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+
+
+
+# Make the DTC.  Include parameters in order to introduce some randomness.  Otherwise the model is going to be "perfect"
+clf = DecisionTreeClassifier(max_depth=3, min_samples_split=6, min_samples_leaf=8, max_features=10)
+
+# Training data
+clf.fit(X_train, y_train)
+
+# Predicitons on testing data
+y_pred_dt = clf.predict(X_test)
+
+# Create a classificaiton report
+dt_classification_report = classification_report(y_test, y_pred_dt)
+
+# Show the accuracy
+accuracy_dt = accuracy_score(y_test, y_pred_dt)
+print(dt_classification_report)
+print("Accuracy:", accuracy_dt)
+
+# Get feature importances
+feature_importances = clf.feature_importances_
+
+# Get feature names
+feature_names = X.columns
+
+# Sort feature importances in descending order
+sorted_indices = feature_importances.argsort()[::-1]
+sorted_importances = feature_importances[sorted_indices]
+sorted_feature_names = feature_names[sorted_indices]
+
+
+
+
+# %% [markdown]
+# The next model will be made using logistical regression
+
+# %%
+from sklearn.linear_model import LogisticRegression
+logisticial_regression = LogisticRegression(solver = 'sag', max_iter = 200)
+
+
+# Train the model
+logisticial_regression.fit(X_train, y_train)
+
+# Predict the testing data
+y_pred_lr = logisticial_regression.predict(X_test)
+
+
+# Create a classificaiton report
+lr_classification_report = classification_report(y_test, y_pred_lr)
+
+# Summarize the accuracy
+accuracy_lr = accuracy_score(y_test, y_pred_lr)
+print(lr_classification_report)
+print("Accuracy:", accuracy_lr)
+
+# %% [markdown]
+# The next model to be implemented will be Random Forest
+
+# %%
+from sklearn.ensemble import RandomForestClassifier
+
+#Create instance of Random Forest.  Make sure to include parameters to introduce randomness
+rfc = RandomForestClassifier(n_estimators = 10, max_depth = 12, min_samples_split = 3, random_state = 42)
+
+# Fit model to the training data
+rfc.fit(X_train, y_train)
+
+# Make predictions
+y_pred_rf = rfc.predict(X_test)
+
+# Create a classificaiton report
+rf_classification_report = classification_report(y_test, y_pred_rf)
+
+# Summarize the accuracy
+accuracy_rf = accuracy_score(y_test, y_pred_rf)
+print(rf_classification_report)
+print("Accuracy:", accuracy_rf)
+
+# %% [markdown]
+# ## Results and Summary ##
+# Here are the basic accuracy results of each model:
+# 
+
+# %%
+pip install tabulate
+
+# %%
+from tabulate import tabulate
+# Create the table names
+models = [
+    ["Decision Tree", accuracy_dt],
+    ["Logistic Regression", accuracy_lr],
+    ["Random Forest", accuracy_rf]
+]
+
+# Table headers 
+headers = ["Model", "Accuracy"]
+
+# Display
+table = tabulate(models, headers, tablefmt = "grid")
+print(table)
+
+# %% [markdown]
+# Here are some additional metrics to measure the performance of each model:
+# 
+
+# %% [markdown]
+# ### Decision Tree Classification Report ###
+
+# %%
+print(dt_classification_report)
+
+# %% [markdown]
+# ### Logistic Regression Classification Report ###
+# 
+
+# %%
+print(lr_classification_report)
+
+# %% [markdown]
+# ### Random Forest Classification Report ###
+# 
+
+# %%
+print(rf_classification_report)
+
+# %% [markdown]
+# #### Decision Tree ####
+# The overall accuracy of the decision tree is 85%, which is commendable.  The model is also precise when looking at drugs A, B, X, and Y but performs poorly with drug C.  The f1-score and recall peform well with drugs A, B, and Y but fail to perform well with drugs C and X.  
+
+# %% [markdown]
+# #### Logistic Regression ####
+# The logistic regression model had an overall accuracy score of 70% which is the lowest of the three models.  Generally speaking this model did not perform well in most metrics regardless of the drug type.  Interestingly though, it was most precise with drug C unlike the other two models.
+
+# %% [markdown]
+# #### Random Forest ####
+# The random forest performed the best of any model with an accuracy of 90%.  In fact, this model performed consistently well across all metrics and drugs with the exception of the precision score of drug C.
+
+# %% [markdown]
+# ### Confusion Matrix ###
+# 
+
+# %%
+from sklearn.metrics import confusion_matrix
+
+# Create a list of models and each prediciton they had
+models = ["Decision Tree", "Logistic Regression", "Random Forest"]
+predictions = [y_pred_dt, y_pred_lr, y_pred_rf]
+
+# Now, go through each model using the zipping method
+for model, pred in zip(models, predictions):
+    cm = confusion_matrix(y_test, pred)
+
+    # Heatmap
+    plt.figure(figsize = (8,6))
+    sns.heatmap(cm, annot = True, fmt = 'd', cmap = "Blues")
+    plt.title(f"Confusion Matrix - {model}")
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
+    plt.show()
+
+# %% [markdown]
+# The confusion matricies further illustrate that the decision tree and random forest models perform well at predicting each drug label.  The confusion matrix for the logistic regression also reinforces the prediction limits of the model.  Interestingly, the logistic regression model did do a good job predicting drug C unlike the other two models.  
+
+# %% [markdown]
+# ### Model Improvement ###
+# This section is dedicated to trying to improve model performance
+
+# %%
+# Model improvement attempt for DTC
+# Original model (max_depth=3, min_samples_split=5, min_samples_leaf=2, max_features=5)
+
+# Make the DTC.  Include parameters in order to introduce some randomness.  Otherwise the model is going to be "perfect"
+# CLF introduces two new parameters with no performance improvement
+clf = DecisionTreeClassifier(max_depth=3, min_samples_split=6, min_samples_leaf=8, max_features=10, random_state = 42, ccp_alpha = 0.13)
+clf2 = DecisionTreeClassifier(max_depth=2, min_samples_split=7, min_samples_leaf=4, max_features=10, random_state = 42, ccp_alpha = 0.14)
+# Training data
+clf.fit(X_train, y_train)
+clf2.fit(X_train, y_train)
+# Predicitons on testing data
+y_pred_dt = clf.predict(X_test)
+y_pred_dt_2 = clf2.predict(X_test)
+# Create a classificaiton report
+dt_classification_report = classification_report(y_test, y_pred_dt)
+dt_classification_report_2 = classification_report(y_test, y_pred_dt_2)
+
+# Show the accuracy
+accuracy_dt = accuracy_score(y_test, y_pred_dt)
+print(dt_classification_report)
+print("Accuracy:", accuracy_dt)
+accuracy_dt_2 = accuracy_score(y_test, y_pred_dt_2)
+print(dt_classification_report_2)
+print("Accuracy:", accuracy_dt_2)
+
+# %% [markdown]
+# Two new parameters were introduced into the model which ultimately did not improve performance.  In fact, by tuning some of these parameters it degraded the overall performance.
+
+# %%
+#Model 
+logisticial_regression = LogisticRegression(solver = 'sag', max_iter = 200)
+logisticial_regression2 = LogisticRegression(solver = 'liblinear', max_iter = 200, penalty = 'l2')
+
+# Train the model
+logisticial_regression.fit(X_train, y_train)
+logisticial_regression2.fit(X_train, y_train)
+
+# Predict the testing data
+y_pred_lr = logisticial_regression.predict(X_test)
+y_pred_lr2 = logisticial_regression.predict(X_test)
+
+# Create a classificaiton report
+lr_classification_report = classification_report(y_test, y_pred_lr)
+lr_classification_report2 = classification_report(y_test, y_pred_lr2)
+
+# Summarize the accuracy
+accuracy_lr = accuracy_score(y_test, y_pred_lr)
+print(lr_classification_report)
+print("Accuracy:", accuracy_lr)
+accuracy_lr2 = accuracy_score(y_test, y_pred_lr2)
+print(lr_classification_report2)
+print("Accuracy:", accuracy_lr2)
+
+# %% [markdown]
+# These changes to the parameters also did not improve performance of the model.  
+
+# %%
+#Create instance of Random Forest.  Make sure to include parameters to introduce randomness
+rfc = RandomForestClassifier(n_estimators = 10, max_depth = 12, min_samples_split = 3, random_state = 42)
+rfc2 = RandomForestClassifier(n_estimators = 1000, max_depth = 1, min_samples_split = 2, random_state = 42, min_impurity_decrease=1000, criterion = 'entropy', bootstrap= False)
+
+# Fit model to the training data
+rfc.fit(X_train, y_train)
+rfc2.fit(X_train, y_train)
+
+# Make predictions
+y_pred_rf = rfc.predict(X_test)
+y_pred_rf2 = rfc.predict(X_test)
+
+# Create a classificaiton report
+rf_classification_report = classification_report(y_test, y_pred_rf)
+rf_classification_report2 = classification_report(y_test, y_pred_rf2)
+
+# Summarize the accuracy
+accuracy_rf = accuracy_score(y_test, y_pred_rf)
+print(rf_classification_report)
+print("Accuracy:", accuracy_rf)
+accuracy_rf2 = accuracy_score(y_test, y_pred_rf2)
+print(rf_classification_report)
+print("Accuracy:", accuracy_rf2)
+
+# %% [markdown]
+# Similarly, changing the parameters did not improve the performance of this model.
+
+# %% [markdown]
+# ## Discussion and Conclusions ##
+# The biggest conclusion in comparing these models is that the random forest performed the best by all metrics and should be the recommneded model if trying to use this in practice.  The decision tree also performed well but despite attempts at improving the model there does not seem to be room for improvement.  The logistic regression model performed the worst out of all three models and could not be improved. 
+# 
+# These machine learning models were all relatively easy to set up and work with.  There were not too many issues when it came to adjusting the models in order to perform well.  
+# 
+# One of the most noteable things about these models was despite turning the parameters, there was not any improvement in any model.  This is probably due to the fact that there was feature engineering done prior to setting the testing and training data.  
+# 
+# Based on the EDA done earlier, the most likely conclusion for the logistic regression model performing poorly is that there was not a strong sense of linear relationships in the dataset.  Logistic regression models are heavily reliant on having linear relationships in the data in order to help predict.  However, it should be noted that this model did the best at identifying drug C. 
+# 
+# On the other hand, decision trees and random forests both handle a lack of linear relationships well.  Random forests in particular are good at capturing more complex relationships in order to make accurate predictions.  
+# 
+# The best way to improve these models overall may be to make the dataset bigger.  Larger datasets always bode well for making models more robust and have a better representation of how well they may perform.  With larger datasets it is possible more linear relationships will be seen which would help the logistic regression model.  Both the decision trees and random forests are already capable of handling complex data so this would just make the models more robust.
+# 
+# 
+
+# %% [markdown]
+# ## Citations ##
+# Thanks to Pratham Tripathi who supplied this dataset on Kaggle:
+# Pratham Tripathi. (June 2020).  Drug Classification, version 1
+# https://www.kaggle.com/datasets/prathamtripathi/drug-classification
+# 
+# For information about Na/K relationships in the human body:
+# 
+# Mirmiran, P., Gaeini, Z., Bahadoran, Z., Ghasemi, A., Norouzirad, R., Tohidi, M., &amp; Azizi, F. (2021, January 6). Urinary sodium-to-potassium ratio: A simple and useful indicator of diet quality in population-based studies - European Journal of Medical Research. BioMed Central. https://eurjmedres.biomedcentral.com/articles/10.1186/s40001-020-00476-5#citeas 
+
+
